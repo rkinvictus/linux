@@ -354,6 +354,50 @@ static void flip_done_handler(struct drm_i915_private *i915,
 	spin_unlock_irqrestore(&dev->event_lock, irqflags);
 }
 
+static enum plane_id bdw_pipe_fault_to_plane(int fault)
+{
+	switch(fault) {
+		default:
+		case 7 ... 10:
+			return fault - 7 + PLANE_PRIMARY;
+		case 11:
+			return PLANE_CURSOR;
+		case 20 ... 22:
+			return PLANE_SPRITE5;
+	}
+}
+
+static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
+				       enum pipe pipe, unsigned long fault_errors)
+{
+	struct intel_crtc *crtc = intel_crtc_for_pipe(i915, pipe);
+	struct intel_plane *plane;
+	struct drm_device *dev = &i915->drm;
+	u8 plane_mask;
+	u32 live, offset, i;
+	unsigned long irqflags;
+
+	spin_lock_irqsave(&crtc->pipefault_lock, irqflags);
+
+	for_each_set_bit(i, &fault_errors, I915_MAX_PLANES)
+		plane_mask |= BIT(bdw_pipe_fault_to_plane(i));
+
+	for_each_intel_plane_on_crtc(dev, crtc, plane) {
+		if (!(BIT(plane->id) & plane_mask))
+			continue;
+
+		live = intel_uncore_read(&i915->uncore,
+					   PLANE_SURFLIVE(pipe, plane->id));
+		offset = intel_uncore_read(&i915->uncore,
+					   PLANE_SURF(pipe, plane->id));
+		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: Live:0x%08x Surf:0x%08x\n",
+				    pipe_name(pipe), plane->base.base.id, plane->base.name,
+				    fault_errors, live, offset);
+	}
+
+	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
+}
+
 static void hsw_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
 				     enum pipe pipe)
 {
@@ -1110,10 +1154,7 @@ void gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 
 		fault_errors = iir & gen8_de_pipe_fault_mask(dev_priv);
 		if (fault_errors)
-			drm_err_ratelimited(&dev_priv->drm,
-					    "Fault errors on pipe %c: 0x%08x\n",
-					    pipe_name(pipe),
-					    fault_errors);
+			bdw_pipe_fault_irq_handler(dev_priv, pipe, fault_errors);
 	}
 
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_PCH_NOP(dev_priv) &&

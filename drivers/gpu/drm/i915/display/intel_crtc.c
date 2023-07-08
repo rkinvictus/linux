@@ -377,6 +377,7 @@ int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 	intel_drrs_crtc_init(crtc);
 	intel_crtc_crc_init(crtc);
 
+	spin_lock_init(&crtc->pipefault_lock);
 	cpu_latency_qos_add_request(&crtc->vblank_pm_qos, PM_QOS_DEFAULT_VALUE);
 
 	drm_WARN_ON(&dev_priv->drm, drm_crtc_index(&crtc->base) != crtc->pipe);
