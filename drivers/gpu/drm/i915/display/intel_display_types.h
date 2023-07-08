@@ -1497,6 +1497,7 @@ struct intel_crtc {
 	/* scalers available on this crtc */
 	int num_scalers;
 
+	spinlock_t pipefault_lock;
 	/* for loading single buffered registers during vblank */
 	struct pm_qos_request vblank_pm_qos;
 
