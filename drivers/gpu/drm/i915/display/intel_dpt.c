@@ -15,6 +15,8 @@
 #include "intel_dpt.h"
 #include "intel_fb.h"
 
+#define i915_is_dpt(vm) ((vm)->is_dpt)
+
 struct i915_dpt {
 	struct i915_address_space vm;
 
@@ -23,9 +25,7 @@ struct i915_dpt {
 	void __iomem *iomem;
 };
 
-#define i915_is_dpt(vm) ((vm)->is_dpt)
-
-static inline struct i915_dpt *
+struct i915_dpt *
 i915_vm_to_dpt(struct i915_address_space *vm)
 {
 	BUILD_BUG_ON(offsetof(struct i915_dpt, vm));
