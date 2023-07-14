@@ -256,6 +256,11 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 		plane_state->ggtt_vma = vma;
 	} else {
 		struct intel_framebuffer *intel_fb = to_intel_framebuffer(fb);
+		struct i915_vma_resource *vma_res;
+		struct sgt_iter sgt_iter;
+		gen8_pte_t __iomem *base;
+		dma_addr_t addr;
+		int i = 0;
 
 		vma = intel_dpt_pin(intel_fb->dpt_vm);
 		if (IS_ERR(vma))
@@ -263,12 +268,23 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 
 		plane_state->ggtt_vma = vma;
 
+		base = (gen8_pte_t *)page_mask_bits(vma->iomap);
 		vma = intel_pin_fb_obj_dpt(fb, &plane_state->view.gtt, false,
 					   &plane_state->flags, intel_fb->dpt_vm);
 		if (IS_ERR(vma)) {
 			intel_dpt_unpin(intel_fb->dpt_vm);
 			plane_state->ggtt_vma = NULL;
 			return PTR_ERR(vma);
+		}
+
+		vma_res = vma->resource;
+		i = vma_res->start / I915_GTT_PAGE_SIZE;
+
+		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
+			if (sg_is_last(sgt_iter.sgp) || (i == 0))
+				drm_dbg_kms(&dev_priv->drm, "DPT OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
+					    i915_vm_to_dpt(intel_fb->dpt_vm), addr, i, readq((void *)&base[i]));
+			i++;
 		}
 
 		plane_state->dpt_vma = vma;

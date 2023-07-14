@@ -13,6 +13,8 @@ struct i915_vma;
 struct intel_crtc;
 struct intel_framebuffer;
 
+struct i915_dpt *
+i915_vm_to_dpt(struct i915_address_space *vm);
 void intel_dpt_destroy(struct i915_address_space *vm);
 struct i915_vma *intel_dpt_pin(struct i915_address_space *vm);
 void intel_dpt_unpin(struct i915_address_space *vm);
