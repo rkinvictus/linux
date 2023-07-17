@@ -202,6 +202,25 @@ i915_gem_shrink(struct i915_gem_ww_ctx *ww,
 			    i915_gem_object_is_framebuffer(obj))
 				continue;
 
+                       if (i915_gem_object_is_framebuffer(obj)) {
+                               struct i915_vma *vma;
+                               int pin_count = atomic_read(&obj->mm.pages_pin_count);
+
+                               pr_info("obj %p pin_count %d\n", obj, pin_count);
+
+                               spin_lock(&obj->vma.lock);
+                               list_for_each_entry(vma, &obj->vma.list, obj_link) {
+                                       if (!i915_vma_is_pinned(vma))
+                                               pr_info("vaddr: %llx\n", vma->node.start);
+
+                                       if (atomic_read(&vma->pages_count))
+                                               pin_count--;
+                               }
+                               spin_unlock(&obj->vma.lock);
+
+                               pr_info("obj %p pin_count %d\n", obj, pin_count);
+                       }
+
 			if (!can_release_pages(obj))
 				continue;
 
