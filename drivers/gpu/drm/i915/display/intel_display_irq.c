@@ -416,14 +416,14 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 		vma_res = vma->resource;
 		i = vma_res->start / I915_GTT_PAGE_SIZE;
 
-		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
-			drm_err_ratelimited(dev, "IRQ DPT OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
-					    i915_vm_to_dpt(intel_fb->dpt_vm), addr, i, readq((void *)&base[i]));
-			i++;
-		}
 		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: plane_mask: %x, Live:0x%08x Surf:0x%08x\n",
 				    pipe_name(pipe), plane->base.base.id, plane->base.name,
 				    fault_errors, plane_mask, live, offset);
+		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
+			drm_err_ratelimited(dev, "IRQ DPT OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
+					    i915_vm_to_dpt(intel_fb->dpt_vm), addr, i,(u64) &base[i]);
+			i++;
+		}
 	}
 
 	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
