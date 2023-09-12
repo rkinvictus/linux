@@ -393,12 +393,9 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 		gen8_pte_t __iomem *base;
 		dma_addr_t addr;
 		struct drm_framebuffer *fb;
-		struct intel_framebuffer *intel_fb;
+		bool use_dpt = false;
 
 		if (!(BIT(plane->id) & plane_mask))
-			continue;
-
-		if (!plane_state->uapi.visible)
 			continue;
 
 		fb = plane_state->hw.fb;
@@ -408,22 +405,25 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 					   PLANE_SURF(pipe, plane->id));
 
 		base = (gen8_pte_t *)page_mask_bits(plane_state->ggtt_vma->iomap);
-		if (intel_fb_uses_dpt(fb))
+		if (intel_fb_uses_dpt(fb)) {
 			vma = plane_state->dpt_vma;
-		else
+			use_dpt =true;
+		} else {
 			vma = plane_state->ggtt_vma;
+		}
 
 		vma_res = vma->resource;
 		i = vma_res->start / I915_GTT_PAGE_SIZE;
 
-		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
-			drm_err_ratelimited(dev, "IRQ DPT OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
-					    i915_vm_to_dpt(intel_fb->dpt_vm), addr, i, readq((void *)&base[i]));
-			i++;
-		}
 		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: plane_mask: %x, Live:0x%08x Surf:0x%08x\n",
 				    pipe_name(pipe), plane->base.base.id, plane->base.name,
 				    fault_errors, plane_mask, live, offset);
+		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
+			drm_err_ratelimited(dev, "IRQ %s OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
+					    use_dpt ? "DPT" : "FB", intel_fb_obj(fb), addr, i, readq(&base[i]));
+			i++;
+		}
+		BUG();
 	}
 
 	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
@@ -1186,8 +1186,11 @@ void gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			intel_cpu_fifo_underrun_irq_handler(dev_priv, pipe);
 
 		fault_errors = iir & gen8_de_pipe_fault_mask(dev_priv);
-		if (fault_errors)
+		if (fault_errors) {
+			drm_err_ratelimited(&dev_priv->drm, "Fault errors on pipe %c: 0x%08x\n",
+					    pipe_name(pipe), fault_errors);
 			bdw_pipe_fault_irq_handler(dev_priv, pipe, fault_errors);
+		}
 	}
 
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_PCH_NOP(dev_priv) &&
