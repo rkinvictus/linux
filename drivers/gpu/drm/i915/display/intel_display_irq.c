@@ -393,7 +393,7 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 		gen8_pte_t __iomem *base;
 		dma_addr_t addr;
 		struct drm_framebuffer *fb;
-		struct intel_framebuffer *intel_fb;
+		bool use_dpt = false;
 
 		if (!(BIT(plane->id) & plane_mask))
 			continue;
@@ -408,10 +408,12 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 					   PLANE_SURF(pipe, plane->id));
 
 		base = (gen8_pte_t *)page_mask_bits(plane_state->ggtt_vma->iomap);
-		if (intel_fb_uses_dpt(fb))
+		if (intel_fb_uses_dpt(fb)) {
 			vma = plane_state->dpt_vma;
-		else
+			use_dpt =true;
+		} else {
 			vma = plane_state->ggtt_vma;
+		}
 
 		vma_res = vma->resource;
 		i = vma_res->start / I915_GTT_PAGE_SIZE;
@@ -420,13 +422,15 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 				    pipe_name(pipe), plane->base.base.id, plane->base.name,
 				    fault_errors, plane_mask, live, offset);
 		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
-			drm_err_ratelimited(dev, "IRQ DPT OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
-					    i915_vm_to_dpt(intel_fb->dpt_vm), addr, i,(u64) &base[i]);
+			drm_err_ratelimited(dev, "IRQ %s OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
+					    use_dpt ? "DPT" : "FB", intel_fb_obj(fb), addr, i, readq(&base[i]));
 			i++;
 		}
 	}
 
 	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
+
+	BUG();
 }
 
 static void hsw_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
