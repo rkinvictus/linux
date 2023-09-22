@@ -168,6 +168,46 @@ TRACE_EVENT(i915_gem_object_fault,
 		      __entry->write ? ", writable" : "")
 );
 
+DECLARE_EVENT_CLASS(i915_mcr,
+	    TP_PROTO(struct intel_gt *gt),
+	    TP_ARGS(gt),
+
+	    TP_STRUCT__entry(
+			     __field(enum intel_gt_type, gt_type)
+			     ),
+
+	    TP_fast_assign(
+			   __entry->gt_type = gt->type;
+			   ),
+
+	    TP_printk("%s GT", __entry->gt_type == GT_MEDIA ? "MEDIA" : "RENDER")
+);
+
+DEFINE_EVENT(i915_mcr, i915_mcr_lock_prewait,
+	     TP_PROTO(struct intel_gt *gt),
+	     TP_ARGS(gt)
+);
+
+DEFINE_EVENT(i915_mcr, i915_mcr_lock_presave,
+	     TP_PROTO(struct intel_gt *gt),
+	     TP_ARGS(gt)
+);
+
+DEFINE_EVENT(i915_mcr, i915_mcr_lock_postsave,
+	     TP_PROTO(struct intel_gt *gt),
+	     TP_ARGS(gt)
+);
+
+DEFINE_EVENT(i915_mcr, i915_mcr_lock_timeout,
+	     TP_PROTO(struct intel_gt *gt),
+	     TP_ARGS(gt)
+);
+
+DEFINE_EVENT(i915_mcr, i915_mcr_unlock,
+	     TP_PROTO(struct intel_gt *gt),
+	     TP_ARGS(gt)
+);
+
 DECLARE_EVENT_CLASS(i915_gem_object,
 	    TP_PROTO(struct drm_i915_gem_object *obj),
 	    TP_ARGS(obj),

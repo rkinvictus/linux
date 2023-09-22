@@ -3,6 +3,7 @@
  * Copyright © 2022 Intel Corporation
  */
 
+#include "i915_trace.h"
 #include "intel_gt.h"
 #include "intel_gt_mcr.h"
 #include "intel_gt_print.h"
@@ -375,10 +376,13 @@ void intel_gt_mcr_lock(struct intel_gt *gt, unsigned long *flags)
 	 * driver threads, but also with hardware/firmware agents.  A dedicated
 	 * locking register is used.
 	 */
+	trace_i915_mcr_lock_prewait(gt);
+
 	if (GRAPHICS_VER_FULL(gt->i915) >= IP_VER(12, 70))
 		err = wait_for(intel_uncore_read_fw(gt->uncore,
 						    MTL_STEER_SEMAPHORE) == 0x1, 100);
 
+	trace_i915_mcr_lock_presave(gt);
 	/*
 	 * Even on platforms with a hardware lock, we'll continue to grab
 	 * a software spinlock too for lockdep purposes.  If the hardware lock
@@ -389,12 +393,14 @@ void intel_gt_mcr_lock(struct intel_gt *gt, unsigned long *flags)
 
 	*flags = __flags;
 
+	trace_i915_mcr_lock_postsave(gt);
 	/*
 	 * In theory we should never fail to acquire the HW semaphore; this
 	 * would indicate some hardware/firmware is misbehaving and not
 	 * releasing it properly.
 	 */
 	if (err == -ETIMEDOUT) {
+		trace_i915_mcr_lock_timeout(gt);
 		gt_err_ratelimited(gt, "hardware MCR steering semaphore timed out");
 		add_taint_for_CI(gt->i915, TAINT_WARN);  /* CI is now unreliable */
 	}
@@ -414,6 +420,7 @@ void intel_gt_mcr_unlock(struct intel_gt *gt, unsigned long flags)
 {
 	spin_unlock_irqrestore(&gt->mcr_lock, flags);
 
+	trace_i915_mcr_unlock(gt);
 	if (GRAPHICS_VER_FULL(gt->i915) >= IP_VER(12, 70))
 		intel_uncore_write_fw(gt->uncore, MTL_STEER_SEMAPHORE, 0x1);
 }
