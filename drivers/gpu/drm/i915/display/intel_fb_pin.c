@@ -245,11 +245,13 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 	bool phys_cursor =
 		plane->id == PLANE_CURSOR &&
 		DISPLAY_INFO(dev_priv)->cursor_needs_physical;
+#if 0
 	struct i915_vma_resource *vma_res;
 	struct sgt_iter sgt_iter;
 	gen8_pte_t __iomem *base;
 	dma_addr_t addr;
 	int i = 0;
+#endif
 
 	if (!intel_fb_uses_dpt(fb)) {
 		vma = intel_pin_and_fence_fb_obj(fb, phys_cursor,
@@ -259,7 +261,7 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 		if (IS_ERR(vma))
 			return PTR_ERR(vma);
 
-		base = (gen8_pte_t *)page_mask_bits(vma->iomap);
+//		base = (gen8_pte_t *)page_mask_bits(vma->iomap);
 		plane_state->ggtt_vma = vma;
 	} else {
 		struct intel_framebuffer *intel_fb = to_intel_framebuffer(fb);
@@ -270,7 +272,7 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 
 		plane_state->ggtt_vma = vma;
 
-		base = (gen8_pte_t *)page_mask_bits(vma->iomap);
+//		base = (gen8_pte_t *)page_mask_bits(vma->iomap);
 		vma = intel_pin_fb_obj_dpt(fb, &plane_state->view.gtt, false,
 					   &plane_state->flags, intel_fb->dpt_vm);
 		if (IS_ERR(vma)) {
@@ -284,6 +286,7 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 		WARN_ON(plane_state->ggtt_vma == plane_state->dpt_vma);
 	}
 
+#if 0
 	vma_res = vma->resource;
 	i = vma_res->start / I915_GTT_PAGE_SIZE;
 
@@ -297,6 +300,7 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 		i++;
 	}
 
+#endif
 	return 0;
 }
 

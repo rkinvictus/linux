@@ -398,9 +398,6 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 		if (!(BIT(plane->id) & plane_mask))
 			continue;
 
-		if (!plane_state->uapi.visible)
-			continue;
-
 		fb = plane_state->hw.fb;
 		live = intel_uncore_read(&i915->uncore,
 					   PLANE_SURFLIVE(pipe, plane->id));
