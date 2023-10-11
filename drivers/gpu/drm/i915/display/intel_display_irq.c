@@ -423,11 +423,10 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 					    use_dpt ? "DPT" : "FB", intel_fb_obj(fb), addr, i, readq(&base[i]));
 			i++;
 		}
+		BUG();
 	}
 
 	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
-
-	BUG();
 }
 
 static void hsw_pipe_crc_irq_handler(struct drm_i915_private *dev_priv,
@@ -1187,8 +1186,11 @@ void gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			intel_cpu_fifo_underrun_irq_handler(dev_priv, pipe);
 
 		fault_errors = iir & gen8_de_pipe_fault_mask(dev_priv);
-		if (fault_errors)
+		if (fault_errors) {
+			drm_err_ratelimited(&dev_priv->drm, "Fault errors on pipe %c: 0x%08x\n",
+					    pipe_name(pipe), fault_errors);
 			bdw_pipe_fault_irq_handler(dev_priv, pipe, fault_errors);
+		}
 	}
 
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_PCH_NOP(dev_priv) &&
