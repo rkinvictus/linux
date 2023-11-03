@@ -372,11 +372,12 @@ static enum plane_id bdw_pipe_fault_to_plane(int fault)
 static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 				       enum pipe pipe, unsigned long fault_errors)
 {
+	struct drm_i915_private *dev_priv = i915;
 	struct intel_crtc *crtc = intel_crtc_for_pipe(i915, pipe);
 	struct intel_plane *plane;
-	struct drm_device *dev = &i915->drm;
+	struct drm_device *dev = &dev_priv->drm;
 	u8 plane_mask;
-	u32 live, offset, i;
+	u32  offset, i;
 	unsigned long irqflags;
 
 	spin_lock_irqsave(&crtc->pipefault_lock, irqflags);
@@ -390,40 +391,88 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 		struct i915_vma *vma;
 		struct i915_vma_resource *vma_res;
 		struct sgt_iter sgt_iter;
-		gen8_pte_t __iomem *base;
+		struct i915_ggtt *ggtt;
+		gen8_pte_t __iomem *gte, *base, *end;
 		dma_addr_t addr;
 		struct drm_framebuffer *fb;
-		bool use_dpt = false;
 
-		if (!(BIT(plane->id) & plane_mask))
+		if (!plane_state->uapi.visible)
 			continue;
 
 		fb = plane_state->hw.fb;
+/*
 		live = intel_uncore_read(&i915->uncore,
 					   PLANE_SURFLIVE(pipe, plane->id));
-		offset = intel_uncore_read(&i915->uncore,
-					   PLANE_SURF(pipe, plane->id));
+*/
+		if (plane->id == PLANE_CURSOR)
+			offset = intel_uncore_read(&i915->uncore, CURBASE(pipe));
+		else {
+			continue;
+			offset = intel_uncore_read(&i915->uncore,
+						   PLANE_SURF(pipe, plane->id));
+		}
 
 		base = (gen8_pte_t *)page_mask_bits(plane_state->ggtt_vma->iomap);
+
 		if (intel_fb_uses_dpt(fb)) {
 			vma = plane_state->dpt_vma;
-			use_dpt =true;
+			vma_res = vma->resource;
+			i = vma_res->start / I915_GTT_PAGE_SIZE;
+
+		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: plane_mask: %x, Surf:0x%08x, DPT OBJ[%p], size: %llx.\n",
+				    pipe_name(pipe), plane->base.base.id, plane->base.name,
+				    fault_errors, plane_mask, offset, intel_fb_obj(fb), vma_res->node_size/I915_GTT_PAGE_SIZE);
+			for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
+				drm_err_ratelimited(dev, "FB Addr: 0x%llx, Pte[%d]: 0x%llx\n",
+						    addr, i, readq(&base[i]));
+				i++;
+			}
 		} else {
 			vma = plane_state->ggtt_vma;
-		}
+			vma_res = vma->resource;
+			ggtt = i915_vm_to_ggtt(vma->vm);
+			gte = (gen8_pte_t __iomem *)ggtt->gsm;
+			i = (vma_res->start - vma_res->guard) / I915_GTT_PAGE_SIZE;
+			gte += i;
+			end = gte + vma_res->guard / I915_GTT_PAGE_SIZE;
 
-		vma_res = vma->resource;
-		i = vma_res->start / I915_GTT_PAGE_SIZE;
-
-		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: plane_mask: %x, Live:0x%08x Surf:0x%08x\n",
+		drm_err_ratelimited(dev, "Fault errors on pipe %c: plane %d:%s: 0x%08lx: plane_mask: %x, Surf:0x%08x, FB OBJ[%p], size: %llx.\n",
 				    pipe_name(pipe), plane->base.base.id, plane->base.name,
-				    fault_errors, plane_mask, live, offset);
-		for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
-			drm_err_ratelimited(dev, "IRQ %s OBJ[%p] Addr: 0x%llx, Pte[%d]: 0x%llx\n",
-					    use_dpt ? "DPT" : "FB", intel_fb_obj(fb), addr, i, readq(&base[i]));
-			i++;
+				    fault_errors, plane_mask, offset, intel_fb_obj(fb), vma_res->node_size/I915_GTT_PAGE_SIZE);
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			while (gte < end - 5)
+				gte++;
+
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+
+			end += (vma_res->node_size + vma_res->guard) / I915_GTT_PAGE_SIZE;
+			for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
+				drm_err_ratelimited(dev, "FB Addr: 0x%llx Pte[%d]: 0x%llx\n",
+						    addr, i++, readq(gte));
+				gte++;
+			}
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			while (gte < end - 5)
+				gte++;
+
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
 		}
-		BUG();
 	}
 
 	spin_unlock_irqrestore(&crtc->pipefault_lock, irqflags);
@@ -1190,6 +1239,7 @@ void gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			drm_err_ratelimited(&dev_priv->drm, "Fault errors on pipe %c: 0x%08x\n",
 					    pipe_name(pipe), fault_errors);
 			bdw_pipe_fault_irq_handler(dev_priv, pipe, fault_errors);
+			BUG();
 		}
 	}
 
