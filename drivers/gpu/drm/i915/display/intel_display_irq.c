@@ -412,10 +412,10 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 						   PLANE_SURF(pipe, plane->id));
 		}
 
-		base = (gen8_pte_t *)page_mask_bits(plane_state->ggtt_vma->iomap);
 
 		if (intel_fb_uses_dpt(fb)) {
 			vma = plane_state->dpt_vma;
+			base = (gen8_pte_t *)page_mask_bits(plane_state->ggtt_vma->iomap);
 			vma_res = vma->resource;
 			i = vma_res->start / I915_GTT_PAGE_SIZE;
 
@@ -447,11 +447,11 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 			while (gte < end - 5)
 				gte++;
 
-			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
 
 			end += (vma_res->node_size + vma_res->guard) / I915_GTT_PAGE_SIZE;
 			for_each_sgt_daddr(addr, sgt_iter, vma_res->bi.pages) {
@@ -459,19 +459,19 @@ static void bdw_pipe_fault_irq_handler(struct drm_i915_private *i915,
 						    addr, i++, readq(gte));
 				gte++;
 			}
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
 			while (gte < end - 5)
 				gte++;
 
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
-			drm_err_ratelimited(dev, "Begin Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
+			drm_err_ratelimited(dev, "End Guard Pte[%d]: 0x%llx\n", i++, readq(gte++));
 		}
 	}
 
